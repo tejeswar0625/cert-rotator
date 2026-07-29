@@ -15,7 +15,7 @@ cert-rotator fills this gap with a purpose-built Go application that owns the co
 
 ## Features
 
-- **Pure Go** — no kubeadm, no radm, no external runtime dependencies
+- **Pure Go** — no kubeadm, no external runtime dependencies
 - **Automated detection** — reads cert expiry directly from `/etc/kubernetes/pki/` using `crypto/x509`
 - **Automated renewal** — generates new certs using Go's crypto stdlib, signs with existing CA key material
 - **Pre-renewal cert backup** — file-level backup of all cert and kubeconfig files before any write

@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cert-rotator
+  namespace: cert-rotator-system
+  labels:
+    app.kubernetes.io/name: cert-rotator
+    app.kubernetes.io/component: operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-rotator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cert-rotator
+    spec:
+      serviceAccountName: cert-rotator
+      # Only run on control plane nodes
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+      # Run as root — required to read/write /etc/kubernetes/pki/
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      containers:
+        - name: cert-rotator
+          image: cert-rotator:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/app/cert-rotator"]
+          args:
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+          env:
+            # Inject node name via downward API — this tells each pod which
+            # control plane node it is managing
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+          volumeMounts:
+            # PKI directory — certs live here
+            - name: pki
+              mountPath: /etc/kubernetes/pki
+            # Kubernetes config dir — kubeconfigs live here
+            - name: kubernetes
+              mountPath: /etc/kubernetes
+            # Static pod manifests — needed for pod restart after cert renewal
+            - name: manifests
+              mountPath: /etc/kubernetes/manifests
+            # Backup and state directory — persisted across pod restarts
+            - name: cert-rotator-data
+              mountPath: /var/lib/cert-rotator
+      volumes:
+        # hostPath mounts — access the node's actual cert and config files
+        - name: pki
+          hostPath:
+            path: /etc/kubernetes/pki
+            type: Directory
+        - name: kubernetes
+          hostPath:
+            path: /etc/kubernetes
+            type: Directory
+        - name: manifests
+          hostPath:
+            path: /etc/kubernetes/manifests
+            type: Directory
+        - name: cert-rotator-data
+          hostPath:
+            path: /var/lib/cert-rotator
+            type: DirectoryOrCreate
+      # Ensure the pod is evicted last during node drain
+      priorityClassName: system-node-critical
+      terminationGracePeriodSeconds: 30

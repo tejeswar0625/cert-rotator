@@ -1,0 +1,23 @@
+apiVersion: cert-rotator.tejeswar0625.dev/v1alpha1
+kind: CertRotationConfig
+metadata:
+  name: cluster
+  # Cluster-scoped resource — no namespace
+spec:
+  thresholdDays: 30
+  checkIntervalHours: 24
+  dryRun: false
+  backupDir: /var/lib/cert-rotator/backups
+  backupRetentionDays: 30
+  pkiDir: /etc/kubernetes/pki
+  kubeconfigDir: /etc/kubernetes
+  manifestsDir: /etc/kubernetes/manifests
+  healthCheckTimeoutSeconds: 30
+  healthCheckMaxAttempts: 10
+  notifications:
+    smtp:
+      enabled: false
+      secretRef: ""
+    slack:
+      enabled: false
+      secretRef: ""

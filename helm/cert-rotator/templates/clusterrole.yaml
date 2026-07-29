@@ -1,0 +1,25 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "cert-rotator.fullname" . }}
+  labels:
+    {{- include "cert-rotator.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["cert-rotator.tejeswar0625.dev"]
+    resources: ["certrotationconfigs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["cert-rotator.tejeswar0625.dev"]
+    resources: ["certrotationconfigs/status"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["cert-rotator.tejeswar0625.dev"]
+    resources: ["certrotationconfigs/finalizers"]
+    verbs: ["update"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]

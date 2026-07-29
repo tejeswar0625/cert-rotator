@@ -1,0 +1,21 @@
+apiVersion: v2
+name: cert-rotator
+description: >
+  A Kubernetes operator for automated rotation of control plane certificates
+  in self-hosted clusters. Runs as a DaemonSet on control plane nodes.
+  Pure Go — no kubeadm, no external dependencies.
+type: application
+version: 0.4.0
+appVersion: "0.4.0"
+keywords:
+  - kubernetes
+  - certificates
+  - pki
+  - operator
+  - control-plane
+  - cert-rotation
+home: https://github.com/tejeswar0625/cert-rotator
+sources:
+  - https://github.com/tejeswar0625/cert-rotator
+maintainers:
+  - name: Tejeswar Kavuluru

@@ -1,0 +1,28 @@
+apiVersion: cert-rotator.tejeswar0625.dev/v1alpha1
+kind: CertRotationConfig
+metadata:
+  name: cluster
+  labels:
+    {{- include "cert-rotator.labels" . | nindent 4 }}
+spec:
+  thresholdDays: {{ .Values.config.thresholdDays }}
+  checkIntervalHours: {{ .Values.config.checkIntervalHours }}
+  dryRun: {{ .Values.config.dryRun }}
+  backupDir: {{ .Values.config.backupDir }}
+  backupRetentionDays: {{ .Values.config.backupRetentionDays }}
+  pkiDir: {{ .Values.config.pkiDir }}
+  kubeconfigDir: {{ .Values.config.kubeconfigDir }}
+  manifestsDir: {{ .Values.config.manifestsDir }}
+  healthCheckTimeoutSeconds: {{ .Values.config.healthCheckTimeoutSeconds }}
+  healthCheckMaxAttempts: {{ .Values.config.healthCheckMaxAttempts }}
+  notifications:
+    smtp:
+      enabled: {{ .Values.config.notifications.smtp.enabled }}
+      {{- if .Values.config.notifications.smtp.secretRef }}
+      secretRef: {{ .Values.config.notifications.smtp.secretRef }}
+      {{- end }}
+    slack:
+      enabled: {{ .Values.config.notifications.slack.enabled }}
+      {{- if .Values.config.notifications.slack.secretRef }}
+      secretRef: {{ .Values.config.notifications.slack.secretRef }}
+      {{- end }}

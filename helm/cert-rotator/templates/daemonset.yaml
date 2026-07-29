@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "cert-rotator.fullname" . }}
+  namespace: {{ include "cert-rotator.namespace" . }}
+  labels:
+    {{- include "cert-rotator.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "cert-rotator.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cert-rotator.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "cert-rotator.serviceAccountName" . }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      priorityClassName: {{ .Values.priorityClassName }}
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      containers:
+        - name: cert-rotator
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/cert-rotator"]
+          args:
+            - --metrics-bind-address=:8080
+            - --health-probe-bind-address=:8081
+          env:
+            # Node name injected via downward API — identifies which control
+            # plane node this pod manages
+            - name: MY_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: pki
+              mountPath: /etc/kubernetes/pki
+            - name: kubernetes
+              mountPath: /etc/kubernetes
+            - name: manifests
+              mountPath: /etc/kubernetes/manifests
+            - name: cert-rotator-data
+              mountPath: /var/lib/cert-rotator
+      volumes:
+        - name: pki
+          hostPath:
+            path: {{ .Values.config.pkiDir }}
+            type: Directory
+        - name: kubernetes
+          hostPath:
+            path: {{ .Values.config.kubeconfigDir }}
+            type: Directory
+        - name: manifests
+          hostPath:
+            path: {{ .Values.config.manifestsDir }}
+            type: Directory
+        - name: cert-rotator-data
+          hostPath:
+            path: /var/lib/cert-rotator
+            type: DirectoryOrCreate
+      terminationGracePeriodSeconds: 30

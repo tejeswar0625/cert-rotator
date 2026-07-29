@@ -1,0 +1,87 @@
+# Default values for cert-rotator operator.
+
+# Namespace where the operator runs.
+namespace: cert-rotator-system
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Container image for the operator.
+image:
+  repository: ktejeswar21/cert-rotator
+  tag: "0.4.0-app"
+  pullPolicy: IfNotPresent
+
+# ServiceAccount configuration.
+serviceAccount:
+  # Override the name — defaults to chart fullname.
+  name: ""
+  annotations: {}
+
+# cert-rotator operator configuration.
+# These values populate the CertRotationConfig CR that is installed by default.
+config:
+  # Days before expiry to trigger cert renewal.
+  thresholdDays: 30
+
+  # How often each control plane node checks cert expiry (hours).
+  checkIntervalHours: 24
+
+  # Dry run — log what would happen without executing.
+  # Set to true to validate the operator before enabling real renewal.
+  dryRun: false
+
+  # Where cert backups are stored on each control plane node.
+  backupDir: /var/lib/cert-rotator/backups
+
+  # How long to keep old cert backups on disk (days).
+  backupRetentionDays: 30
+
+  # Host paths — these must match the actual paths on the control plane nodes.
+  # Change these only if your cluster uses non-standard paths.
+  pkiDir: /etc/kubernetes/pki
+  kubeconfigDir: /etc/kubernetes
+  manifestsDir: /etc/kubernetes/manifests
+
+  # Health check configuration after static pod restart.
+  healthCheckTimeoutSeconds: 30
+  healthCheckMaxAttempts: 10
+
+  # Notifications — configure SMTP and/or Slack for renewal alerts.
+  notifications:
+    smtp:
+      enabled: false
+      # Name of a Secret in the operator namespace containing:
+      # host, port, username, password, from, to
+      secretRef: ""
+    slack:
+      enabled: false
+      # Name of a Secret in the operator namespace containing:
+      # webhook_url
+      secretRef: ""
+
+# DaemonSet resource requests and limits.
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# Node selector for the DaemonSet — targets control plane nodes.
+# Do not change this unless your cluster labels control plane nodes differently.
+nodeSelector:
+  node-role.kubernetes.io/control-plane: ""
+
+# Tolerations so the DaemonSet pod runs on tainted control plane nodes.
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+
+# Priority class — ensures cert-rotator pod is evicted last during node drain.
+priorityClassName: system-node-critical

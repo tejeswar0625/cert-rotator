@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "cert-rotator.namespace" . }}
+  labels:
+    {{- include "cert-rotator.labels" . | nindent 4 }}

@@ -1,6 +1,6 @@
 # cert-rotator
 
-A production-grade, pure Go application for automated rotation of Kubernetes control plane certificates in self-hosted clusters.
+A production-grade Kubernetes Operator, written in pure Go, for automated rotation of control plane certificates in self-hosted clusters. Deployed as a DaemonSet, it reconciles a `CertRotationConfig` custom resource on each control plane node.
 
 ## Why cert-rotator?
 
@@ -12,6 +12,33 @@ Kubernetes control plane certificates issued by kubeadm have a default validity 
 - Cron scripts — no HA awareness, no rollback, no state management
 
 cert-rotator fills this gap with a purpose-built Go application that owns the complete certificate lifecycle.
+
+## How it's deployed
+
+cert-rotator follows the standard Kubernetes Operator pattern:
+
+- A `CertRotationConfig` **CustomResourceDefinition (CRD)** defines the desired rotation policy (threshold days, check interval, backup settings, notifications).
+- A controller-runtime **reconciler** watches this CRD and drives each control plane node toward the desired state.
+- The controller runs as a **DaemonSet** — one pod per control plane node — since each pod only manages certs local to its own node's filesystem. Leader election is intentionally disabled; each pod independently reconciles its own node rather than one pod managing the whole cluster.
+- Status (cert expiry, phase, last renewal, per-node conditions) is written back to the CR's `status` subresource, so cluster state is queryable natively:
+
+```bash
+kubectl get certrotationconfig
+kubectl describe certrotationconfig default
+```
+
+### Example CR
+
+```yaml
+apiVersion: cert-rotator.tejeswar0625.dev/v1alpha1
+kind: CertRotationConfig
+metadata:
+  name: default
+spec:
+  thresholdDays: 30
+  checkIntervalHours: 24
+  dryRun: false
+```
 
 ## Features
 
@@ -45,7 +72,8 @@ cert-rotator fills this gap with a purpose-built Go application that owns the co
 CA certificates (`ca`, `etcd-ca`, `front-proxy-ca`) are explicitly excluded — 10-year validity, separate rotation procedure required.
 
 ## How it works
-Reconciliation loop (every 24h)
+
+Reconcile() triggered by controller-runtime — on CR create/update, or on periodic RequeueAfter (default: every 24h, configurable via checkIntervalHours)
 ↓
 Read certs from /etc/kubernetes/pki/ via crypto/x509
 ↓
@@ -74,8 +102,11 @@ On any failure — write error, pod restart failure, or health check failure —
 - State is persisted throughout — if cert-rotator crashes mid-rollback, it resumes on restart
 
 ## Package structure
+
 cert-rotator/
-├── cmd/main.go              # entry point, reconciliation loop
+├── cmd/main.go              # entry point, controller-runtime manager setup
+├── api/v1alpha1/            # CertRotationConfig CRD types + deepcopy
+├── internal/controller/     # reconciler (Reconcile loop, status patching)
 ├── pkg/
 │   ├── detector/            # cert expiry detection via crypto/x509
 │   ├── generator/           # RSA key generation, x509 template builder
@@ -101,6 +132,15 @@ cert-rotator/
 | `dry_run` | `false` | Log what would happen without executing |
 | `smtp_enabled` | `false` | Enable SMTP notifications |
 | `slack_webhook_enabled` | `false` | Enable Slack webhook notifications |
+
+## Installation
+
+```bash
+helm install cert-rotator ./helm/cert-rotator \
+  --namespace cert-rotator --create-namespace
+```
+
+Then apply a `CertRotationConfig` CR (see example above) to activate rotation.
 
 ## Building
 ```bash

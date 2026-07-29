@@ -1,0 +1,170 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: certrotationconfigs.cert-rotator.tejeswar0625.dev
+  labels:
+    app.kubernetes.io/name: cert-rotator
+spec:
+  group: cert-rotator.tejeswar0625.dev
+  names:
+    kind: CertRotationConfig
+    listKind: CertRotationConfigList
+    plural: certrotationconfigs
+    singular: certrotationconfig
+    shortNames:
+      - crc
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Last Checked
+          type: string
+          jsonPath: .status.lastCheckedAt
+        - name: Last Renewed
+          type: string
+          jsonPath: .status.lastRenewedAt
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                thresholdDays:
+                  type: integer
+                  default: 30
+                  minimum: 1
+                  maximum: 365
+                  description: Days before expiry to trigger renewal
+                checkIntervalHours:
+                  type: integer
+                  default: 24
+                  minimum: 1
+                  maximum: 168
+                  description: How often each node checks cert expiry
+                dryRun:
+                  type: boolean
+                  default: false
+                  description: Log what would happen without executing
+                backupDir:
+                  type: string
+                  default: /var/lib/cert-rotator/backups
+                  description: Where cert backups are stored on each node
+                backupRetentionDays:
+                  type: integer
+                  default: 30
+                  minimum: 1
+                  description: How long to keep old cert backups
+                pkiDir:
+                  type: string
+                  default: /etc/kubernetes/pki
+                  description: Path to the Kubernetes PKI directory on the node
+                kubeconfigDir:
+                  type: string
+                  default: /etc/kubernetes
+                  description: Path to the Kubernetes config directory on the node
+                manifestsDir:
+                  type: string
+                  default: /etc/kubernetes/manifests
+                  description: Path to the static pod manifests directory on the node
+                healthCheckTimeoutSeconds:
+                  type: integer
+                  default: 30
+                  minimum: 5
+                  description: Timeout for each health check probe in seconds
+                healthCheckMaxAttempts:
+                  type: integer
+                  default: 10
+                  minimum: 1
+                  description: Max health check retries after static pod restart
+                notifications:
+                  type: object
+                  properties:
+                    smtp:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        secretRef:
+                          type: string
+                    slack:
+                      type: object
+                      properties:
+                        enabled:
+                          type: boolean
+                        secretRef:
+                          type: string
+            status:
+              type: object
+              properties:
+                phase:
+                  type: string
+                  enum: [Idle, Renewing, Failed]
+                lastCheckedAt:
+                  type: string
+                  format: date-time
+                lastRenewedAt:
+                  type: string
+                  format: date-time
+                nodes:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      node:
+                        type: string
+                      phase:
+                        type: string
+                        enum: [Idle, Detecting, Renewing, RollingBack, Failed, Critical]
+                      lastCheckedAt:
+                        type: string
+                        format: date-time
+                      lastRenewedAt:
+                        type: string
+                        format: date-time
+                      backupPath:
+                        type: string
+                      failureReason:
+                        type: string
+                      certs:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            expiryTime:
+                              type: string
+                              format: date-time
+                            residualDays:
+                              type: integer
+                            status:
+                              type: string
+                              enum: [OK, APPROACHING, EXPIRED]
+                conditions:
+                  type: array
+                  items:
+                    type: object
+                    required: [type, status]
+                    properties:
+                      type:
+                        type: string
+                      status:
+                        type: string
+                      reason:
+                        type: string
+                      message:
+                        type: string
+                      lastTransitionTime:
+                        type: string
+                        format: date-time
